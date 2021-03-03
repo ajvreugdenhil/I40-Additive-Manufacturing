@@ -9,7 +9,7 @@ import socket
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-logger.level = logging.DEBUG
+logger.level = logging.INFO
 
 
 printer_shutdown_function = None
@@ -71,7 +71,7 @@ def update_loop(mqtt_client, printer):
     logger.info("Starting update loop")
 
     while True:
-        time.sleep(10)
+        time.sleep(0.5)
         msg = printer.get_status()
         # TODO: check msg validity
         result = mqtt_client.publish(topic, json.dumps(msg))
