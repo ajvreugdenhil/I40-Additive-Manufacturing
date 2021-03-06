@@ -22,7 +22,7 @@ class Printer:
         except:
             logger.critical("Printer unavailable!")
 
-        # TODO: make more elgant
+        # TODO: make more elegant
         self.serial.read_until("ok\n".encode())
         time.sleep(2)
         self.serial.reset_input_buffer()
@@ -78,6 +78,17 @@ class Printer:
             response += b"\n" + self.serial.readline()
         return response
 
+    # -----------
+    # Parse functions
+    def get_status_progress(self):
+        data = self.send_command("M27").decode().split("\n")[0]
+        words = data.split(" ")
+        bothvalues = words[3]  # HACK
+        current = int(bothvalues.split("/")[0])
+        goal = int(bothvalues.split("/")[1])
+        result = (current, goal)
+        return result
+
     def get_status_location(self):
         data = self.send_command("M114").decode()
         # X:0.00 Y:0.00 Z:0.00 E:0.00 Count X:0 Y:0 Z:0\nok\n
@@ -99,6 +110,19 @@ class Printer:
     def get_status_uuid(self):
         data = self.send_command("M115").decode()
         # b'FIRMWARE_NAME:Marlin A8 PLUS V1.6 (Github) SOURCE_CODE_URL:https://github.com/MarlinFirmware/Marlin PROTOCOL_VERSION:1.0 MACHINE_TYPE:3D Printer EXTRUDER_COUNT:1 UUID:cede2a2f-41a2-4748-9b12-c55c62f367ff\nCap:SERIAL_XON_XOFF:0\n
+        keyword = "UUID:"
+        start_index = data.index(keyword)+len(keyword)
+        uuid = data[start_index:start_index+36]
+        return uuid
+
+    def get_status_firmware(self):
+        data = self.send_command("M115").decode()
+        # b'FIRMWARE_NAME:Marlin A8 PLUS V1.6 (Github) SOURCE_CODE_URL:https://github.com/MarlinFirmware/Marlin PROTOCOL_VERSION:1.0 MACHINE_TYPE:3D Printer EXTRUDER_COUNT:1 UUID:cede2a2f-41a2-4748-9b12-c55c62f367ff\nCap:SERIAL_XON_XOFF:0\n
+        raise NotImplementedError
+        # I'm not masochistic enough to go through all possible
+        # variants of the string to properly parse it
+        # I'm sorry.
+        return None
 
     def get_status_temperatures(self):
         data = self.send_command("M105").decode()
@@ -106,19 +130,19 @@ class Printer:
 
         t_actual_start_index = data.index("T")+2
         t_actual_end_index = data.index(" ", t_actual_start_index)
-        t_a = (data[t_actual_start_index:t_actual_end_index])
+        t_a = float(data[t_actual_start_index:t_actual_end_index])
 
         t_goal_start_index = data.index("/")+1
         t_goal_end_index = data.index(" ", t_goal_start_index)
-        t_g = (data[t_goal_start_index:t_goal_end_index])
+        t_g = float(data[t_goal_start_index:t_goal_end_index])
 
         b_actual_start_index = data.index("B")+2
         b_actual_end_index = data.index(" ", b_actual_start_index)
-        b_a = (data[b_actual_start_index:b_actual_end_index])
+        b_a = float(data[b_actual_start_index:b_actual_end_index])
 
         b_goal_start_index = data.index("/", b_actual_start_index)+1
         b_goal_end_index = data.index(" ", b_goal_start_index)
-        b_g = (data[b_goal_start_index:b_goal_end_index])
+        b_g = float(data[b_goal_start_index:b_goal_end_index])
 
         result = {}
         result["temp_hotend_actual"] = t_a
@@ -133,10 +157,20 @@ class Printer:
             # TODO: make more AAS-y
             status["location"] = self.get_status_location()
             status["temperatures"] = self.get_status_temperatures()
+            status["uuid"] = self.get_status_uuid()
+            progress = {}
+            progress_data = self.get_status_progress()
+            progress["current"] = progress_data[0]
+            progress["goal"] = progress_data[1]
+            status["progress"] = progress
+
             return status
         else:
             logger.error("Status asked of non-ready printer")
             return None
+
+    # End parse functions
+    # ----------
 
     def is_active(self):
         # TODO: Allow non-SD printing
@@ -160,7 +194,7 @@ class Printer:
 
 
 if __name__ == "__main__":
-    logger.debug("TEST")
+    pass
 
 
 '''

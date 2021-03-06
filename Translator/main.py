@@ -32,8 +32,8 @@ def signal_handler_hard_shutdown(sig, frame):
 # MQTT
 broker = 'otpi.home'
 port = 1883
-topic = "aas/proof_of_concept"
-client_id = 'python-mqtt-5'
+base_topic = "aas/"
+client_id = None
 username = 'streamsheets'
 password = 'w2FXLOgMD1'
 
@@ -71,8 +71,9 @@ def update_loop(mqtt_client, printer):
     logger.info("Starting update loop")
 
     while True:
-        time.sleep(0.5)
+        time.sleep(1)
         msg = printer.get_status()
+        topic = base_topic + client_id
         # TODO: check msg validity
         result = mqtt_client.publish(topic, json.dumps(msg))
         status = result[0]
@@ -85,12 +86,6 @@ def update_loop(mqtt_client, printer):
 def main():
     logger.info("Starting!")
 
-    # MQTT
-    client = connect_mqtt()
-    if client is None:
-        exit()
-    client.loop_start()
-
     # Printer
     p = Printer(printer_port, printer_baud)
     p.start()
@@ -101,8 +96,16 @@ def main():
     global printer_shutdown_function
     printer_shutdown_function = p.graceful_shutdown
 
-    update_loop(client, p)
+    # MQTT
+    global client_id  # HACK
+    client_id = p.get_status_uuid()
+    client = connect_mqtt()
+    if client is None:
+        p.graceful_shutdown()
+        exit()
+    client.loop_start()
 
+    update_loop(client, p)
     logger.info("Exiting!")
 
 
